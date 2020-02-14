@@ -69,7 +69,7 @@ Paste the below code there. Modify `server_name` and `upstream` uri according to
 
 #### Verify nginx configurations
 
-To verify whether your configurations are current, run the command below.
+To verify whether your configurations are correct, run the command below.
 
     sudo nginx -t
 

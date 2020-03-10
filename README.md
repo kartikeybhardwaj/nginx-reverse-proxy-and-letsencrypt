@@ -10,6 +10,7 @@ This guide is for people using ubuntu server.
 3. Verify nginx configurations
 4. Reload nginx service
 5. Let's Encrypt for HTTPS
+6. Renew certificate before it expires
 
 #### Update server
 
@@ -109,3 +110,7 @@ We now need to get the http changed to https. Run the command below, certbot wil
 This runs certbot with the `--nginx` plugin, you can also use `-d` to specify the names in one liner.
 
 Follow the on-screen instructions to auto SSL configs.
+
+#### Renew certificate before it expires
+
+    sudo certbot renew --force-renewal

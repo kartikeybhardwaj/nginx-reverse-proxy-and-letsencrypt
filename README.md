@@ -97,7 +97,7 @@ You’ll need to press ENTER to accept.
 
 Install Certbot’s Nginx package
 
-    sudo apt install python-certbot-nginx
+    sudo apt install python3-certbot-nginx
 
 We now need to get the http changed to https. Run the command below, certbot will automatically find the sites running via nginx.
 

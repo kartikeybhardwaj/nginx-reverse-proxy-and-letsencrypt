@@ -1,116 +1,136 @@
-# Setup your app behind NGINX reverse proxy with Let's Encrypt
+# Setup Your App Behind NGINX Reverse Proxy with Let's Encrypt
 
-This guide is for people using ubuntu server.
+This guide is for people using Ubuntu server (20.04+).
 
 #### Plan of action
 
 1. Update server
-1. Install nginx
-2. Setup nginx configurations
-3. Verify nginx configurations
-4. Reload nginx service
-5. Let's Encrypt for HTTPS
-6. Renew certificate before it expires
+2. Install nginx
+3. Setup nginx configurations
+4. Verify nginx configurations
+5. Reload nginx service
+6. Let's Encrypt for HTTPS
+7. Verify auto-renewal
 
 #### Update server
 
-    sudo apt update
+    sudo apt update && sudo apt upgrade -y
 
 #### Install nginx
 
     sudo apt install nginx
 
-Nginx might not start automatically
+Start and enable nginx to run on boot:
 
-    sudo /etc/init.d/nginx start
-    
-    or
+    sudo systemctl start nginx
+    sudo systemctl enable nginx
 
-    sudo service nginx start
+To check if the service is running:
 
-To check if service is running
-
-    sudo /etc/init.d/nginx status
-    
-    or
-    
-    sudo service nginx status
+    sudo systemctl status nginx
 
 #### Setup nginx configurations
 
-Go to config folder of sites in nginx
+Create your site configuration in `sites-available` and symlink it to `sites-enabled`:
 
-    cd /etc/nginx/sites-enabled
-
-Create your site configuration
-
-    sudo vi <git.example.com>.conf
+    sudo vi /etc/nginx/sites-available/git.example.com.conf
 
 Paste the below code there. Modify `server_name` and `upstream` uri according to your need.
 
     server {
-        server_name <git.example.com>;
+        server_name git.example.com;
+
         # The internal IP of the VM that hosts your app
-        set $upstream <0.0.0.0:4200>;
+        set $upstream 127.0.0.1:4200;
+
         location / {
-            proxy_pass_header Authorization;
             proxy_pass http://$upstream;
+            proxy_pass_header Authorization;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
             proxy_http_version 1.1;
             proxy_set_header Connection "";
             proxy_buffering off;
-            client_max_body_size 0;
-            proxy_read_timeout 36000s;
+            client_max_body_size 50m;
+            proxy_read_timeout 300s;
             proxy_redirect off;
         }
+
+        # Security headers [1]
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+
         listen 80;
     }
 
-#### Verify nginx configurations
+Enable the site by creating a symlink:
 
-To verify whether your configurations are correct, run the command below.
+    sudo ln -s /etc/nginx/sites-available/git.example.com.conf /etc/nginx/sites-enabled/
+
+Remove the default config if not needed:
+
+    sudo rm /etc/nginx/sites-enabled/default
+
+#### Verify nginx configurations
 
     sudo nginx -t
 
 #### Reload nginx service
 
-You're going to have to reload the nginx service for the changes we just made.
-
-    sudo service nginx reload
+    sudo systemctl reload nginx
 
 #### Let's Encrypt for HTTPS
 
-Certbot packages provided by Ubuntu tend to be outdated. However, the Certbot developers maintain a Ubuntu software repository with up-to-date versions, so we’ll use that repository instead.
-Let us install all the dependencies first to proceed.
+Certbot is now officially distributed via **snap**. The old PPA (`ppa:certbot/certbot`) and apt packages are deprecated and no longer maintained [2].
 
-To add repository you need `software-properties-common`
+**1. Install snapd** (if not already installed):
 
-    sudo apt install software-properties-common
+    sudo apt install snapd
+    sudo snap install core
+    sudo snap refresh core
 
-Add repository
+**2. Remove any old certbot packages:**
 
-    sudo add-apt-repository ppa:certbot/certbot
-    
-You’ll need to press ENTER to accept.
+    sudo apt-get remove certbot python3-certbot-nginx -y
 
-Install Certbot’s Nginx package
+**3. Install Certbot via snap:**
 
-    sudo apt install python3-certbot-nginx
+    sudo snap install --classic certbot
 
-We now need to get the http changed to https. Run the command below, certbot will automatically find the sites running via nginx.
+**4. Ensure the certbot command is available:**
+
+    sudo ln -s /snap/bin/certbot /usr/local/bin/certbot
+
+**5. Obtain and install the certificate:**
 
     sudo certbot --nginx
-    
-    or
-    
+
+Or specify domains directly:
+
     sudo certbot --nginx -d git1.example.com -d git2.example.com
 
-This runs certbot with the `--nginx` plugin, you can also use `-d` to specify the names in one liner.
+Follow the on-screen instructions. Certbot will automatically configure HTTPS in your nginx config.
 
-Follow the on-screen instructions to auto SSL configs.
+#### Verify auto-renewal
 
-#### Renew certificate before it expires
+Certbot's snap package automatically installs a systemd timer that renews certificates before they expire [3]. No manual cron job or `--force-renewal` is needed.
 
-    sudo certbot renew --force-renewal
+Test that auto-renewal is working:
+
+    sudo certbot renew --dry-run
+
+You can verify the timer is active with:
+
+    sudo systemctl list-timers | grep certbot
+
+---
+
+#### References
+
+1. [OWASP Secure Headers Project](https://owasp.org/www-project-secure-headers/)
+2. [Certbot official installation instructions (snap)](https://certbot.eff.org/instructions?ws=nginx&os=snap)
+3. [Let's Encrypt — Certbot snap announcement](https://community.letsencrypt.org/t/a-new-way-to-install-certbot-on-linux/120408)

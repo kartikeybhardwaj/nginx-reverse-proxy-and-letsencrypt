@@ -1,5 +1,16 @@
+# Environment
+.env*
+
+# OS
 .DS_Store
-firebase-debug.log
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
+
+# Logs
+firebase-debug.log
